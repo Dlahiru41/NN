@@ -30,7 +30,7 @@ create_io_matrix <- function(data, lag_order) {
 
   colnames(x) <- paste0("lag_", 1:lag_order)
 
-  return(list(x = x, y = y))
+  return(list(x = as.data.frame(x), y = y))
 }
 
 # Create I/O matrices for different lag orders
@@ -44,7 +44,7 @@ normalize <- function(x) {
 
 # Normalize I/O matrices
 normalized_matrices <- lapply(io_matrices, function(mat) {
-  list(x = apply(mat$x, 2, normalize), y = normalize(mat$y))
+  list(x = as.data.frame(lapply(mat$x, normalize)), y = normalize(mat$y))
 })
 
 # Function to train and evaluate models
@@ -53,10 +53,10 @@ train_and_evaluate <- function(x, y, hidden_layers, linear_output = FALSE) {
   formula <- as.formula(paste("y ~", paste(colnames(x), collapse = " + ")))
 
   # Train the model
-  model <- neuralnet(formula, data = data.frame(x, y = y), hidden = hidden_layers, linear.output = linear_output)
+  model <- neuralnet(formula, data = cbind(x, y = y), hidden = hidden_layers, linear.output = linear_output)
 
   # Make predictions
-  predictions <- predict(model, data.frame(x))
+  predictions <- predict(model, x)
 
   # Calculate performance metrics
   rmse <- rmse(y, predictions)
@@ -120,9 +120,16 @@ best_model_name <- names(results)[which.min(sapply(results, function(x) x$metric
 best_model <- results[[best_model_name]]
 
 # Make predictions on the test set
-test_matrix <- create_io_matrix(test_data, lag_orders[as.numeric(substr(best_model_name, 4, 4))])
-test_x <- as.data.frame(normalize(test_matrix$x))
+# lag_order <- lag_orders[as.numeric(substr(best_model_name, 4, 4))]
+lag_order <- 10
+test_matrix <- create_io_matrix(test_data, lag_order)
+test_x <- as.data.frame(lapply(test_matrix$x, normalize))
 test_y <- normalize(test_matrix$y)
+
+print("Debug: Final test_x column names")
+print(colnames(test_x))
+
+predictions <- predict(best_model$model, test_x)
 
 print("Debug: Best model name")
 print(best_model_name)
